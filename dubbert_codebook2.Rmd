@@ -1,0 +1,218 @@
+---
+title: "Codebook"
+author: "Jacob Dubbert"
+date: "8/1/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+## Download of Data
+The data comes from the Word Development Indicators (WDI) from the World Bank. Specifically, the WDI R package which includes a broad selection of WDI indicators. The relevant data used for analysis are GDP (current US$) ('NY.GDP.MKTP.CD'), foreign direct investment net inflows (BoP, current US$) ('BX.KLT.DINV.CD.WD'), foreign direct investment net inflows (% of GDP) ('BX.KLT.DINV.WD.GD.ZS'), trade as a percentage of GDP ('NE.TRD.GNFS.ZS'), total population (SP.POP.TOTL), . GDP per capita was also calculated and used as an independent variable. 
+
+```{r}
+# install.packages("WDI")
+require(WDI)
+
+fdiall <- WDI(country = "all", indicator = c("NY.GDP.MKTP.CD", "BX.KLT.DINV.CD.WD", "BX.KLT.DINV.WD.GD.ZS", "NE.TRD.GNFS.ZS", "SP.POP.TOTL"), start = 1970,
+  end = 2017, extra = T, cache = NULL)
+```
+
+I then filtered out NAFTA countries specifically for my analysis. Next, for readability, I converted the FDI and GDP values to billions and made them each new variables. Additionally, I added a NAFTA variable to specify which years in the data were under NAFTA and which were not. NAFTA went into effect on January 1, 1994, so the years 1994-2017 are coded as a TRUE and the years from 1970-1993 are coded as FALSE. To better develop my model to predict FDI inflows, I also added a GDP per capita variable.
+
+```{r}
+require(dplyr)
+fdiall <- fdiall %>% 
+  filter(region != "Aggregates") %>% 
+  select(iso3c, country, year, gdp = NY.GDP.MKTP.CD, fdi = BX.KLT.DINV.CD.WD, fdi_percent_gdp = BX.KLT.DINV.WD.GD.ZS, trade = NE.TRD.GNFS.ZS, population = SP.POP.TOTL, region, income) %>% 
+  filter(country %in% c("United States", "Canada", "Mexico"))
+```
+
+```{r}
+options(scipen=999)
+fdiall$fdi_billions=fdiall$fdi/1000000000
+fdiall$gdp_billions=fdiall$gdp/1000000000
+```
+
+```{r}
+fdiall <- fdiall %>% 
+  mutate(NAFTA = (year>=1994))
+```
+
+```{r}
+fdiall <- fdiall %>% 
+  mutate(gdp_per_cap = (gdp/population))
+```
+
+## Variables
+
+1. FDI Net Inflows (`fdi`) - A continuous variable that measures foreign direct investment net inflows into a country annually, from 1970-2016, measured in millions USD. Inward flows represent transactions that increase the investment that foreign investors have in enterprises resident in the reporting economy less transactions that decrease the investment of foreign investors in resident enterprises. This will be the main dependent variable in the analysis.
+
+## Time-Series Plot: FDI Net Inflows; NAFTA countries
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=fdi_billions, color=NAFTA)) +
+  geom_line() + 
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('FDI Net Inflows 1970-2017: Canada, Mexico and the United States')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data=fdiall, aes(year, y=fdi_billions, color=country)) +
+  geom_line(size=2) +
+  ggtitle('FDI Net Inflows 1970-2017: Canada, Mexico and the United States')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1986:2002)), aes(year, y=fdi_billions, color=NAFTA)) +
+  geom_line() + 
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('FDI Net Inflows 1986-2002: Canada, Mexico and the United States')
+```
+
+2. FDI net inflows as a percent of GDP: A dependent variable that measures FDI inflows as a percentage of GDP. This will be used as an alternative dependent variable to pure FDI inflows. The dataset covers the years 1970-2017. 
+
+# Time-Series Plot: FDI Net Inflows (% of GDP); NAFTA Countries
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=fdi_percent_gdp, color=NAFTA)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('FDI Net Inflows (% of GDP) 1970-2017: Canada, Mexico and the United States')
+```
+
+
+3. Gross Domestic Product (`gdp`) - GDP is a continuous variable and is from 1970-2017. Gross domestic product (GDP) at current US$. The dataset covers the years 1970-2017.
+
+# Time-Series Plot: GDP; NAFTA Countries
+```{r}
+require(ggplot2)
+ggplot(data = filter(fdiall, year %in% c(1970:2017)), aes(year, y=gdp_billions)) +
+  geom_line() +
+  geom_point()+
+  facet_wrap(.~country) +
+  ggtitle('GDP (current US$) 1970-2017: Canada, Mexico and the United States')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data = fdiall, aes(year, y=gdp_billions, color=country)) +
+  geom_line(size=2) +
+  ggtitle('GDP (current US$) 1970-2017: Canada, Mexico and the United States')
+```
+
+4. Trade openness (`trade`) - A continuous variable that takes total exports + imports as a percentage of GDP. The dataset covers the years 1970-2017. 
+
+# Time-Series Plot: Trade; NAFTA Countries
+```{r}
+require(ggplot2)
+ggplot(data = filter(fdiall, year %in% c(1970:2017)), aes(year, y=trade)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('Trade Openness (trade as a % of GDP) 1970-2017: Canada, Mexico and the US')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data = fdiall, aes(year, y=trade, color=country)) +
+  geom_line(size=2) +
+  ggtitle('Trade Openness (trade as a % of GDP) 1970-2017: Canada, Mexico and the US')
+```
+
+## Histogram of Trade Openness; NAFTA countries
+```{r}
+summary(fdiall$fdi)
+hist(fdiall$trade)
+```
+
+5. Population (`pop`) - A continuous variable that is total yearly population. The dataset covers the years 1970-2017.
+
+## Time-Series Plot: Population; NAFTA Countries
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=population)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('Total Population 1970-2017: Canada, Mexico and the US')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data=fdiall, aes(year, y=population, color=country)) +
+  geom_line(size=2) +
+  ggtitle('Total Population 1970-2017: Canada, Mexico and the US')
+```
+
+6. GDP per Capita (`gdp_per_cap`) - A continuous variable that represents the gross domestic product per capita of each country. The dataset covers the years 1970-2017.
+
+## Time-Series Plot: GDP per Capita; NAFTA Countries
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=gdp_per_cap, color=NAFTA)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('GDP per Capita 1970-2017: Canada, Mexico and the US')
+```
+ 
+8. Year (`year`) - This is the four-digit year. The dataset covers 1970-2017.
+
+```{r}
+require(knitr)
+kable(table(fdiall$year))
+```
+
+```{r}
+year <- as.numeric(fdiall$year)
+year <- unique(year)
+table(year)
+```
+
+9. Free Trade Agreement (`NAFTA`) - This will be a dummy categorical variable with a value of 1 for every year with an FTA (NAFTA) and 0 for a year without. NAFTA went into effect in 1994, so the years 1994 and after will have a value of 1. The dataset covers the years 1970-2017. 
+
+```{r}
+table(fdiall$NAFTA, fdiall$year)
+```
+
+```{r}
+NAFTA <- as.numeric(year>= 1994)
+NAFTA <- data_frame(NAFTA)
+print(NAFTA)
+```
+
+```{r}
+require(ggplot2)
+
+ggplot(data=NAFTA, aes(x=NAFTA)) +
+  geom_histogram(bins = 3) + ggtitle("Distribution of Years with and without FTA (1970-2016)") +
+  xlab("Agreement (1=YES, 0=NO)")+
+  ylab("Frequency")
+```
+
+## Summary Statistics 
+```{r}
+library(fBasics)
+vars <- data_frame(gdp = fdiall$gdp_billions, fdi = fdiall$fdi_billions, trade = fdiall$trade, population = fdiall$population, gdppercapita = fdiall$gdp_per_cap)
+basicStats(vars)[c("Mean", "Stdev", "Median", "Minimum", "Maximum", "nobs"),]
+```
+
+## Correlation Matrix
+This correlation matrix was inspired from: http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software
+
+```{r}
+library("PerformanceAnalytics")
+chart.Correlation(fdiall[,c(4:7, 13)], histogram=TRUE)
+
+```
+

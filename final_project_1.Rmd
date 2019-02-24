@@ -1,0 +1,346 @@
+---
+title: "The Impact of NAFTA on FDI Net Inflows into Canada, Mexico and the United States"
+author: "Jacob Dubbert"
+date: "8/13/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+---------------
+![nafta](https://upload.wikimedia.org/wikipedia/commons/2/20/NAFTA_logo.png)
+------------------
+
+
+The aim of this analysis is to explore the impact of free trade agreements (FTAs) on foreign direct investment (FDI). In particular, I will examine how multilateral FTAs effect FDI inflows of the involved countries. To do this, I will focus on the North American Free Trade Agreement (NAFTA), and its sequential effect on FDI inflows into the US, Canada and Mexico.
+
+The purpose of exploring this question is to identify the benefits of FTAs in terms of FDI. Have FDI inward flows into the NAFTA region increased or decreased after the agreement? Which country benefitted most from NAFTA in terms of FDI? These questions are important to explore because the literature seems mixed on the actual effects. Additionally, free trade agreeements have been contested over the last few years, with many questioning the benefits of them. This has been especially apparent in regards to NAFTA. However, it is widely determined in the literature that FDI benefits economies; therefore, if NAFTA increased FDI into the three countries involved, there is a large benefit to the FTA.
+
+The objective of this analysis is to evaluate the actual FDI flows into all three NAFTA countries to critically assess the the impact NAFTA had on them individually, as well as for the entire region. My results using a comprehensive data set spanning a 37 year period (1980-2017) show that NAFTA had a positive impact on total inward FDI into the region as a whole, with an estimated increase in FDI net inflows of approximately $33.5 billion in NAFTA years. However, when analyzing the individual country effect, I find that the US was the main beneficiary of the agreement. In the next section, I will first briefly decribe the North American Free Trade Agreement (NAFTA) and foreign direct investment (FDI), and the reasons why a multilateral trade agreement such as NAFTA can significantly influence FDI flows. Second, a brief literature review is presented, followed by a discussion of the data and methodology used in the analysis. Subsequently, a visual analysis of FDI net inflows into each of the NAFTA countries over time is presented to assess prevalent trends. Finally, the results of the OLS regression models used to identify the relationship between FDI net inflows and NAFTA are described. An assessment and discussion of results are included in the last section.
+
+## Foreign Direct Investment (FDI) and the North American Free Trade Agreement (NAFTA)
+FDI net inflows "are the value of inward direct investment made by non-resident investors in the reporting economy" (World Bank). Flows of FDI have been increasing significantly over time, and are influenced by many factors, including trade and investment policies. By liberalizing trade and investment rules and restrictions, countries can attract foreign investment which can be beneficial to a country's economy.
+
+The North American Free Trade Agreement (NAFTA), implemented on January 1, 1994, created the largest free trade area in the world. NAFTA is a multilateral trade agreement between the United States, Canada, and Mexico, which sought to eliminate all tariffs and most non-tariff barriers among the three countries over a 15-year period. It also sought to reduce barriers to foreign direct investment, establish dispute resolution mechanisms, create rules of origin guidelines and protect intellectual property rights.
+
+After more than twenty-four years, the future of NAFTA is uncertain. President Donald Trump has proposed to renegotiate or withdraw from the historic trade agreement, labeling it as one of the worst trade deals in American history. Many others have criticized it as well. However, many economists and academics identify the agreement as having a positive impact on trade flows, FDI flows and the overall economies of each of the nations involved. 
+
+While the trade liberalization aspect of the agreement recieves most of the attention, NAFTA had a few very important provisions in regards to investment. These include Most-Favored nation treatment, equal treatment for foreign investors and a dispute settlement mechanism. These provisions are seen as making the NAFTA region a more attractive destination for foreign investment. 
+
+## Literature Review
+The literature has analyzed the impact of NAFTA on FDI inflows quite extensively; however, the exact impact lacks a consensus. Cuevas et al. (2005) found that FTAs have a significant positive effect on FDI flows and matter more for the smaller members of the agreement. For instance, NAFTA’s effect on FDI flows into Mexico are much larger than its effect on flows into the US, with total FDI flows nearly 60 percent higher than they would have been without the agreement. Similarily, MacDermott (2006) found strong evidence that NAFTA had a positive impact on FDI both in aggregate, as well as at the country level, for each of the member countries. Feils D. and Rahman M. (2008) also found that NAFTA had a generally positive effect on inward FDI into the entire region, but with the benefits accruing only to the US and Canada. 
+
+```{r}
+# Download relevant data from WDI R package
+# install.packages("WDI")
+require(WDI)
+fdiall <- WDI(country = "all", indicator = c("NY.GDP.MKTP.CD", "BX.KLT.DINV.CD.WD", "BX.KLT.DINV.WD.GD.ZS", "NE.TRD.GNFS.ZS", "SP.POP.TOTL", "FP.CPI.TOTL.ZG", "NE.EXP.GNFS.ZS"), start = 1970,
+  end = 2017, extra = T, cache = NULL)
+```
+
+```{r}
+# Filter out NAFTA countries (US, Canada, Mexico) for analysis
+require(dplyr)
+fdiall <- fdiall %>% 
+  filter(region != "Aggregates") %>% 
+  select(iso3c, country, year, gdp = NY.GDP.MKTP.CD, fdi = BX.KLT.DINV.CD.WD, fdi_percent_gdp = BX.KLT.DINV.WD.GD.ZS, trade = NE.TRD.GNFS.ZS, population = SP.POP.TOTL, inflation = FP.CPI.TOTL.ZG, exports = NE.EXP.GNFS.ZS, region, income) %>% 
+  filter(country %in% c("United States", "Canada", "Mexico")) 
+```
+
+```{r}
+# Convert FDI and GDP to billions; makes new variables
+options(scipen=999)
+fdiall$fdi_billions=fdiall$fdi/1000000000 
+fdiall$gdp_billions=fdiall$gdp/1000000000 
+```
+
+```{r}
+# Create NAFTA binary variable
+fdiall <- fdiall %>% 
+  mutate(NAFTA = as.numeric(year>=1994)) 
+```
+
+```{r}
+# Create GDP per capita variable
+fdiall <- fdiall %>% 
+  mutate(gdp_per_cap = (gdp/population)) 
+```
+
+## Data and Methodology
+In order to determine the impact of NAFTA on inward FDI, I examined FDI net inflows in Canada, Mexico and the United States between 1970 and 2017 as reported by the World Bank in its World Development Indicators. Specifically, the WDI R package is used which includes a broad selection of WDI indicators.
+
+I use OLS regression models to test the impact of NAFTA on inward FDI both into the entire NAFTA region, and into each country individually. The dependent variable used in the analyses is fdi_billions and measures foreign direct investment net inflows into a country annually, from 1970-2017. For ease of interpretation and analysis, I convert FDI values to billions USD.
+
+The main independent variable is NAFTA, and the control variables are GDP per capita, trade openness, population, and inflation; all downloaded from the WDI database. A description and graph of each variable can be seen in the codebook here [link](file:///Users/jake/Documents/Applied%20Research%20in%20Data%20Science/dubbert_codebook2.html). 
+
+## Descriptive Statistics
+The basic descriptive statistics of each variable can be seen below.
+```{r, results='asis'}
+library(stargazer)
+stargazer(fdiall, type = "html", summary.stat =c("n", "sd", "mean", "median", "min", "max"), summary.logical = FALSE)
+```
+
+## Correlation Between Variables
+Below is a correlation matrix showing the correlations between all variables used in the analysis. The correlation matrix was inspired from STHDA [link](http://www.sthda.com/english/wiki/correlation-matrix-a-quick-start-guide-to-analyze-format-and-visualize-a-correlation-matrix-using-r-software). As you can see below, the correlation between both GDP per capita and population and FDI net inflows is quite significant, at 0.73 and 0.66 respectively.
+
+```{r}
+library("PerformanceAnalytics")
+chart.Correlation(fdiall[,c(7:9, 13, 16)], histogram=TRUE)
+```
+
+## FDI Net Inflows in 1994 Across the World
+Below is an interactive map of FDI net inflows in the year NAFTA was signed. The year can be changed to any year between 1970-2017 to compare FDI net inflows across the world. The map was produced with the Plotly package. 
+
+
+```{r}
+library(plotly)
+library(WDI)
+require(WDI)
+
+fdiinflows <- WDI(country = "all", indicator = c("BX.KLT.DINV.CD.WD"), start = 1990, end = 2016, extra = T, cache = NULL)
+fdismall <- fdiinflows %>% 
+  filter(region != "Aggregates") %>% 
+  select(iso3c, year, remit = BX.KLT.DINV.CD.WD, income, lending)
+l <- list(color = toRGB("white"), width = 2)
+g <- list(scope = 'world', projection = list(type = 'world'), showlakes = TRUE, lakecolor = toRGB('white'))
+
+p <- plot_geo(filter(fdismall, year==1994), locationmode = 'world') %>% 
+  add_trace(z = ~remit, locations = ~iso3c, color = ~remit, colors = 'Purples') %>% 
+  colorbar(title = "Inflows") %>% 
+  layout(title = 'FDI Net Inflows in 1994', geo = g)
+p
+```
+
+
+## Visual Analysis of FDI Net Inflows into the NAFTA Region
+The following analysis presents a visual depiction of FDI flows into Canada, Mexico and the US over time to provide a foundation for further analysis. 
+
+
+## Analyzing FDI net inflows from 1970-2017 in Canada, Mexico and the United States
+Figures 1 and 2 below show the evolution of FDI net inflows into each of the NAFTA countries. The years under NAFTA are colored light blue while the years before NAFTA are dark blue. FDI inflows into the US clearly dwarf those of Canada and Mexico, but that is to be expected based on its much larger population, economy, history of low investment barriers and investment attractiveness. While net inflows have been steadily increasing since 1970 in each of the countries, there is no discernible pattern in the time period from 1970 to the mid-to-late 1980s. In the late 1980s, the US observed an uptick of FDI inflows until dropping off significantly in 1990-1991, before skyrocketing from around 1994 to 2000. In all three countries, FDI net inflows clearly start trending upward and spike up in the early 1990s. While NAFTA didnt go into effect until January 1994, the clear break in the trend is most likely in response to the negotiation and anticipated implementation of the agreement. 
+
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=fdi_billions, color=NAFTA)) +
+  geom_line() + 
+  geom_point() +
+  facet_wrap(.~country) +
+  xlab("Year") +
+  ylab("FDI Net Inflows (Billions)") +
+  ggtitle('Figure 1: FDI Net Inflows 1970-2017: Canada, Mexico and the United States')
+```
+
+```{r}
+require(ggplot2)
+ggplot(data=fdiall, aes(year, y=fdi_billions, color=country)) +
+  geom_line(size=2) +
+  ggtitle('Figure 2: FDI Net Inflows 1970-2017: Canada, Mexico and the United States') +
+   xlab("Year") +
+  ylab("FDI Net Inflows (Billions)")
+```
+
+## FDI net inflows (% of GDP) from 1970-2017
+Another way to analyze FDI net inflows is to observe them as a percent of GDP. This allows for a better comparison of net FDI inflows between Canada, Mexico and the US. In Figure 3 below, a structural change in FDI net inflows (% of GDP) in each of the three countries can be observed right around 1994 when NAFTA was implemented. The volatitlity in FDI flows seems to increase at that time as well. While FDI inflows in Mexico and the US follow a gradual uptrend after 1994 until 2017, Canada observes a large spike in FDI inflows around 2000, and then by 2017, FDI is back to levels seen before 1990. 
+
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1970:2017)), aes(year, y=fdi_percent_gdp, color=NAFTA)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(.~country) +
+  ggtitle('Figure 3: FDI Net Inflows (% of GDP) 1970-2017: Canada, Mexico and the United States') +
+   xlab("Year") +
+  ylab("FDI Net Inflows (% of GDP)")
+```
+
+## Basic Statistics  
+To observe the effects of NAFTA, I will focus the analysis to 10 years before NAFTA was implemented and 10 years after. The tables below show basic statistics on the inflows of FDI into Canada, Mexico and the US. I compare the mean and the standard deviation of the flows for the years 1984-1993 (before NAFTA) in Table 1 and 1994-2004 (after NAFTA) in Table 2. As you can see from Table 1 and 2, the magnitude of FDI inflows into each of the three countries increases significantly after NAFTA went into effect. For Canada, the average annual FDI inflows in the 10 years after NAFTA increased almost 500% from the period before, FDI inflows into Mexico increased over 600%, and FDI inflows into the US increased almost 400%. The volatility of flows also increased quite significantly in all three countries, as seen by the standard deviation. 
+
+## Table 1: FDI Inflows before NAFTA, 1984-1993
+```{r}
+require(dplyr)
+library(lemon)
+knit_print.data.frame <- lemon_print
+fdiall %>% 
+  filter(year %in% c(1984:1993)) %>% 
+  group_by(country) %>% 
+  summarise(Mean =mean(fdi_billions), SD=sd(fdi_billions)) 
+```
+
+## Table 2: FDI Inflows After NAFTA, 1994-2004
+```{r}
+require(dplyr)
+library(lemon)
+knit_print.data.frame <- lemon_print
+fdiall %>% 
+  filter(year %in% c(1994:2004)) %>% 
+  group_by(country) %>% 
+  summarise(Mean =mean(fdi_billions), SD=sd(fdi_billions))
+```
+
+## FDI Net Inflows 1984-2004
+To get a better idea of the changes in net FDI inflows before and after NAFTA, Figure 4 looks at the FDI inflows ten years before the agreement was implemented and ten years after. 
+
+```{r}
+require(ggplot2)
+ggplot(data=filter(fdiall, year %in% c(1984:2004)), aes(year, y=fdi_billions, color=NAFTA)) +
+  geom_line() + 
+  geom_point() +
+  facet_wrap(.~country) +
+  xlab("Year") +
+  ylab("FDI Net Inflows (Billions)") +
+  ggtitle('Figure 4: FDI Net Inflows 1984-2004: Canada, Mexico and the United States')
+```
+
+## Pre/post effect of NAFTA on FDI Net Inflows: Canada, Mexico and the United States
+Figure 5 below is a similar graph as before, but with a smoothed trend line and partitioned into two panels; one representing before NAFTA (red line) and one representing after NAFTA (green line). This enables the ability to observe any real differences in trends between the two time periods. The trend line in all three countries clearly steepens after NAFTA goes into effect, with the US seeing a significant change. While the steepening trend in Canada and Mexico isn't as pronounced, there is still a considerable change observed.  
+
+```{r}
+require(ggplot2)
+
+fdiall0 <- fdiall %>% 
+  mutate(NAFTA = (year>=1994))
+
+ggplot(fdiall0, aes(x=year, y=fdi_billions, color=NAFTA)) +
+  geom_point() + 
+  stat_smooth(method="lm") + 
+  facet_wrap(.~country) +
+   xlab("Year") +
+  ylab("FDI Net Inflows (Billions)") +
+  ggtitle('Figure 5: Pre/post effect of NAFTA on FDI Net Inflows: Canada, Mexico and the United States')
+```
+
+
+```{r, include=FALSE}
+# Model 0: (`lm0`)
+lm0 <- lm(data=fdiall, fdi_billions ~ NAFTA)
+```
+
+```{r, include=FALSE}
+# Residuals Plot 
+plot(lm0)
+```
+
+```{r, include=FALSE}
+# Model 1: (`lm1`)
+lm1 <- lm(data=fdiall, fdi_billions ~ NAFTA + gdp_per_cap)
+```
+
+```{r, include=FALSE}
+# Residuals Plot 
+plot(lm1)
+```
+
+```{r, include=FALSE}
+# Model 2: (`lm2`) 
+require(dplyr)
+lm2 <- lm(fdi_billions ~ NAFTA + gdp_per_cap + trade, data = fdiall)
+```
+
+```{r, include=FALSE}
+# Residuals Plot 
+plot(lm2)
+```
+
+```{r, include=FALSE}
+# Model 3: (`lm3`)
+require(dplyr)
+lm3 <- lm(fdi_billions ~ NAFTA + gdp_per_cap + trade + population + inflation, data =fdiall)
+```
+
+```{r, include=FALSE}
+# Residuals Plot 
+plot(lm3)
+```
+
+## Results
+The results from the regressions for the entire region are presented in Table 3 below. Model 1 tests the sole effect of NAFTA on FDI inflows; Model 2 considers both NAFTA and GDP; Model 3 condsider NAFTA, GDP and trade openness, as the literature identifies these as having a significant effect on FDI; and Model 4 brings in all other control variables; population and inflation. 
+
+In my final model, the NAFTA variable, representing the years in which the countries were part of the agreement, is both positive and statistically significant, suggesting that the implementation of NAFTA led to an increase in FDI for the region. Specifically, the estimated increase in FDI net inflows in NAFTA years is approximately $33.5 billion for the region as a whole. Thus, implementation of NAFTA increased investment flows into the member countries, validating the idea that trade agreements which liberalize trade and investment do in fact increase foreign investment. 
+
+Additionally, as GDP per capita increases, the flow of FDI increases as well. While this increase is minimal, it is statistically significant. Trade openness is found to be negative and insignificant, while inflation is found to be positive and significant at the 0.1 level. 
+
+```{r, results='asis'}
+library(stargazer)
+library(dplyr)
+
+stargazer(lm0, lm1, lm2, lm3, type = "html", title = "Table 3: Regression Analysis of the Impact of NAFTA on FDI net inflows into All three NAFTA Countries") # can use "text" here for output as well (not as pretty)
+```
+
+## Analyzing the impact of NAFTA on individual FDI net inflows into Canada, Mexico and the United States
+To better understand the impact of the agreement on FDI inflows, the following analysis looks at each NAFTA country individually. This will allow for the ability to assess the impact of NAFTA on each of the specific economies. Of course, since country characteristics vary significantly in Canada, Mexico and the US, it is important to analyze them seperately. The variables used in the individual country regressions are those from Model 4 in the regression for the entire region: FDI net inflows is the dependent variable and the independent variables are NAFTA, GDP, Trade, Population and Inflation. 
+
+```{r, include=FALSE}
+# Ordinary Least Squares (OLS) Regression Model : Canada
+require(dplyr)
+canada <- fdiall %>% 
+  filter(country=="Canada")
+lmcanada <- lm(fdi_billions ~ NAFTA + gdp_per_cap + trade + population + inflation, data =canada)
+```
+
+```{r, include=FALSE}
+# Ordinary Least Squares (OLS) Regression Model : Mexico
+require(dplyr)
+mexico <- fdiall %>% 
+  filter(country=="Mexico")
+lmmexico <- lm(fdi_billions ~ NAFTA + gdp_per_cap + trade + population + inflation, data =mexico)
+```
+
+```{r, include=FALSE}
+# Ordinary Least Squares (OLS) Regression Model : United States
+require(dplyr) 
+us <- fdiall %>% 
+  filter(country=="United States")
+lmus <- lm(fdi_billions ~ NAFTA + gdp_per_cap + trade + population + inflation, data =us)
+```
+
+## Results: Individual impact of NAFTA on Canada, Mexico and the US
+The results for the regression for each NAFTA member individually are reported in Table 4.  While the regression above indicated a sizable positive impact of NAFTA on FDI net inflows into the entire NAFTA region, analyzing each country individually tells a different story. 
+
+The NAFTA variable has a positive and significant (p<0.1) coefficient for the US; however, for Mexico it is positive but not statistically significant and for Canada it is negative and not statistically significant. The estimated increase in FDI in NAFTA years for the US is approximately $83.25 billion; while for Mexico it is $1.97 billion and for Canada it is -$7.19 billion. These results show that the highly developed US economy was the main beneficiary of increases in inward FDI stemming from NAFTA. 
+
+```{r, results='asis'}
+library(stargazer)
+library(dplyr)
+
+stargazer(lmcanada, lmmexico, lmus, type = "html", column.labels = c("Canada", "Mexico", "US"), title = "Table 4: Regression Analysis of the Individual Impact of NAFTA on FDI Net Inflows into All Three NAFTA Countries")
+```
+
+## Conclusions
+This study applied an OLS regression model to a data set of Canada, Mexico and the US in order to investigate the effects of NAFTA on foreign direct investment. Much like the previous literature, the evidence suggests that the agreement spurred an increase in FDI net inflows into the member countries as a whole; however, each country saw large deviations in effects individually. NAFTA is estimated to increase FDI net inflows into the NAFTA region by approximately $33.5 billion in NAFTA years, with the US being the main beneficary. Surprisingly, the net effect of NAFTA on Canada's FDI inflows was negative. This is a much different result than most previous literature (Cuevas et al. 2005; Feils & Rahman 2007; MacDermott 2007). 
+
+Further analysis of the NAFTA impact on FDI flows could be improved by using bilateral FDI flow data. This would allow for the ability to analyze individual country effects in more detail. Additionally, running regressions on different ranges of years (before and after NAFTA panels) could be done for a robustness check. 
+
+## Sources
+Cardamone, Paola, Scoppola, Margherita. 2012 "The impact of EU preferential trade agreements on Foreign Direct Investment.'
+  The World Economy.
+  
+Cuevas, Alfredo, Miguel Messmacher and Alejandro Werner. 2005. "Foreign Direct Investment in Mexico since the Approval of 
+  NAFTA." The World Bank Economic Review. Vol. 19(3).
+  
+Feils, Dorothee and Manzur Rahman. 2007. "Regional economic integration and foreign direct investment: The case of NAFTA."
+  Management International Review.
+  
+Monge-Narangjo, Alexander. 2018. "The Impact of NAFTA on Foreign Direct Investment flows in Mexico and the Excluded
+  Countries"
+
+Moon, Jongchol. 2009. "The Influence of Free Trade Agreement on Foreign Direct Investment: Comparison with non-FTA
+  countries"
+
+Thangavelu, Shandre and Christopher Findlay. 2011. "Chapter 4 The Impact of Free Trade Agreements on Foreign Direct
+  Investment in the the Asia-Pacific Region"
+
+Walskirch, Andreas and Ayca Tekin-Koru. 2010. "North American Integration and Canadian Foreign Direct Investment" The B.E.
+  Journal of Economic Analysis and Policy, De Gruyter, vol. 10(1), pages 1-4-, August.
+  
+The World Bank. "What is the difference between Foreign Direct Investment (FDI) net inflows and net outflows? Retrieved from
+  https://datahelpdesk.worldbank.org/knowledgebase/articles/114954-what-is-the-difference-between-foreign-direct-inve.
+  
+
+
+
+
+
+
